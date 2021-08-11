@@ -1,0 +1,332 @@
+﻿4.1
+База данных содержит список аэропортов практически всех крупных городов России. В большинстве городов есть только один аэропорт. Исключение составляет:
+
+
+select city, count(airport_name) as cnt from dst_project.airports
+  where city in ('St. Petersburg','Moscow','Ulyanovsk','Anapa')
+  group by city
+  order by cnt
+
+
+4.2
+4.2.1 Таблица рейсов содержит всю информацию о прошлых, текущих и запланированных рейсах. Сколько всего статусов для рейсов определено в таблице?
+
+
+select count(distinct status) from dst_project.flights
+
+
+4.2.2. Какое количество самолетов находятся в воздухе на момент среза в базе (статус рейса «самолёт уже вылетел и находится в воздухе»).
+
+
+select count (flight_id) from dst_project.flights
+  where actual_departure is not  null and actual_arrival is null
+
+
+4.2.3. Места определяют схему салона каждой модели. Сколько мест имеет самолет модели  (Boeing 777-300)?
+
+
+select count(seat_no) from dst_project.seats
+  inner join dst_project.aircrafts 
+      on seats.aircraft_code=aircrafts.aircraft_code
+  where model='Boeing 777-300'
+
+
+4.2.4. Сколько состоявшихся (фактических) рейсов было совершено между 1 апреля 2017 года и 1 сентября 2017 года?
+
+
+select count(actual_arrival) from dst_project.flights
+  where (date(actual_arrival) >= '2017-04-01' 
+     and date(actual_arrival) <='2017-09-01') 
+     and dst_project.flights.status<>'Cancelled' 
+
+
+
+
+4.3
+4.3.1. Сколько всего рейсов было отменено по данным базы?
+
+
+select status, count(flight_no) from dst_project.flights
+group by status
+
+
+
+
+
+
+
+
+
+
+4.3.2. Сколько самолетов моделей типа Boeing, Sukhoi Superjet, Airbus находится в базе авиаперевозок?
+
+
+select SUBSTRING(model, 1, 6) as mod1, count(aircraft_code) from dst_project.aircrafts 
+  where model like('%Boeing%') 
+or model like('%Sukhoi Superjet%') 
+or model like ('%Airbus%')
+  group by mod1
+
+
+4.3.3. В какой части (частях) света находится больше аэропортов?
+
+
+select
+    case
+        when airports.timezone like 'Asia%' then 'Asia'
+        when airports.timezone like 'Europ%' then 'EUR'
+        when airports.timezone like 'Australia%' then 'Australia'
+        when lower(airports.timezone) like 'Europe/Asia%' then 'EA'
+    end as continent,
+    count (case
+        when airports.timezone like 'Asia%' then 'Asia'
+        when airports.timezone like 'Europ%' then 'EUR'
+        when airports.timezone like 'Australia%' then 'Australia'
+        when lower(airports.timezone) like 'Europe/Asia%' then 'EA'
+    end) as cnt
+from dst_project.airports
+group by continent
+
+
+
+
+ 4.3.4 У какого рейса была самая большая задержка прибытия за все время сбора данных? Введите id рейса (flight_id).
+
+
+select         flight_id
+,scheduled_arrival - actual_arrival as delay from dst_project.flights
+   order by delay asc
+   limit 1
+
+
+4.4
+Вопрос 1. Когда был запланирован самый первый вылет, сохраненный в базе данных?
+
+
+select min(scheduled_departure) from dst_project. flights
+
+
+Вопрос 2. Сколько минут составляет запланированное время полета в самом длительном рейсе?
+
+
+select          date_part('hour', scheduled_arrival - scheduled_departure) * 60 +
+               date_part('minute', scheduled_arrival - scheduled_departure) as duration 
+  from dst_project.flights 
+  order by duration desc
+
+
+
+
+
+
+Вопрос 3. Между какими аэропортами пролегает самый длительный по времени запланированный рейс?
+
+
+select departure_airport, arrival_airport,  date_part('hour', scheduled_arrival - scheduled_departure) * 60 +
+       date_part('minute', scheduled_arrival - scheduled_departure) as duration 
+  from dst_project.flights 
+  order by duration desc
+  limit 1
+
+
+Вопрос 4. Сколько составляет средняя дальность полета среди всех самолетов в минутах? Секунды округляются в меньшую сторону (отбрасываются до минут).
+
+
+select avg(date_part('hour', actual_arrival - actual_departure) * 60 +
+       date_part('minute', actual_arrival - actual_departure)) as duration from dst_project.flights 
+
+
+
+
+4.5
+4.5.1. Мест какого класса у SU9 больше всего?
+
+
+select fare_conditions, count(fare_conditions) as cnt from dst_project.seats
+  where aircraft_code = 'SU9' 
+  group by fare_conditions
+  order by cnt
+  limit 1
+
+
+4.5.2. Какую самую минимальную стоимость составило бронирование за всю историю?
+
+
+select min(total_amount) from dst_project.bookings
+
+
+4.5.3. Какой номер места был у пассажира с id = 4313 788533?
+
+
+select passenger_id, seat_no
+  from dst_project.boarding_passes as bp
+  inner join dst_project.tickets as t on bp.ticket_no=t.ticket_no
+  where passenger_id='4313 788533'
+
+
+
+
+5.1
+
+
+Вопрос 1. Анапа — курортный город на юге России. Сколько рейсов прибыло в Анапу за 2017 год?
+
+
+select count (actual_arrival) from dst_project.flights
+  inner join dst_project.airports 
+on flights.arrival_airport=airports.airport_code and date_part('year', actual_arrival)=2017
+  where city='Anapa'
+
+
+
+
+
+
+
+
+
+
+Вопрос 2. Сколько рейсов из Анапы вылетело зимой 2017 года?
+
+
+select count (actual_departure) from dst_project.flights
+  inner join dst_project.airports 
+on flights.arrival_airport=airports.airport_code 
+      and date_part('year', actual_arrival)=2017 
+      and date_part('month',actual_arrival) IN (1,2,12)
+  where city='Anapa'
+
+
+Вопрос 3. Посчитайте количество отмененных рейсов из Анапы за все время.
+
+
+select count(flight_id)  from dst_project.flights
+  inner join dst_project.airports 
+on flights.departure_airport=airports.airport_code 
+  where city='Anapa' and status ='Cancelled'
+
+
+
+
+Вопрос 4. Сколько рейсов из Анапы не летают в Москву?
+
+
+select count (flight_id) from dst_project.flights
+  inner join dst_project.airports as air1 
+on flights.departure_airport=air1.airport_code 
+  inner join dst_project.airports as air2 
+on flights.arrival_airport=air2.airport_code
+  where air1.city='Anapa' and air2.city<>'Moscow'
+
+
+Вопрос 5. Какая модель самолета летящего на рейсах из Анапы имеет больше всего мест?
+
+
+select flight_id, flights.aircraft_code, aircrafts.model, count (seats.seat_no) as v   from dst_project.flights
+  inner join dst_project.airports 
+on flights.departure_airport=airports.airport_code 
+  inner join dst_project.aircrafts 
+on flights.aircraft_code=aircrafts.aircraft_code
+  inner join dst_project.seats 
+on flights.aircraft_code=seats.aircraft_code
+  where airports.city='Anapa' 
+  group by flight_id, flights.aircraft_code, aircrafts.model
+  order by v desc
+  limit 1
+
+
+
+
+
+
+
+
+with flights as 
+(
+-- таблица с рейсами из Анапы (базовая?)
+  SELECT flight_id, flight_no, city_dep.city as dep_city, city_arr.city as arr_city, aircrafts.model, f.aircraft_code, scheduled_departure, 
+        date_part('hour', scheduled_arrival - scheduled_departure) * 60 + date_part('minute', scheduled_arrival - scheduled_departure) as duration, /*длительность перелета расписание*/
+        date_part('hour', actual_arrival - actual_departure) * 60 + date_part('minute', actual_arrival - actual_departure) as duration_actual /*длитеьность перелета факт*/
+
+
+  FROM dst_project.flights as f
+  inner join dst_project.airports as city_dep --получаем город вылета
+    on f.departure_airport=city_dep.airport_code
+  inner join dst_project.airports as city_arr -- получаем город прилета
+    on f.arrival_airport=city_arr.airport_code
+  inner join dst_project.aircrafts as aircrafts -- Получаем модель воздушного судна
+    on f.aircraft_code=aircrafts.aircraft_code
+    
+WHERE departure_airport = 'AAQ'
+  AND (date_trunc('month', scheduled_departure) in ('2016-12-01','2017-02-01','2017-02-01', '2017-12-01'))
+  AND status not in ('Cancelled')
+  ),
+  
+
+
+-- Общее количество посадочных мест в самолете (не в модели, а конкретном самолете на конкретном рейсе)
+seats_class as
+(
+with cnt_total as 
+(
+with seats_count as (
+  select aircraft_code, 'total_number' as ztype_val, count(seat_no) as cnt
+    from dst_project.seats
+    group by aircraft_code, ztype_val
+
+
+  union all
+-- количество мест каждого класса
+  select aircraft_code, fare_conditions as  ztype_val, count(seat_no) as cnt
+    from dst_project.seats
+    group by aircraft_code, ztype_val
+    order by aircraft_code, ztype_val
+)
+
+
+select aircraft_code,
+    case
+        when seats_count.ztype_val like 'Business'  then cnt
+    end as business,
+    case
+         when seats_count.ztype_val like 'Comfort'  then cnt
+    end as comfort,
+    case
+         when seats_count.ztype_val like 'Economy'  then cnt
+    end as economy,
+    case
+         when seats_count.ztype_val like 'total_number'  then cnt
+    end as total_number
+    
+from seats_count
+)
+select aircraft_code, sum(business) as buisness_class, sum(comfort) as comfort_class, sum(economy) as economy_class, sum (total_number) as total_seats from cnt_total
+group by aircraft_code
+)
+
+
+
+
+
+
+-- итоговый запрос
+select flights.flight_id, flight_no, dep_city, arr_city, model, buisness_class, /*comfort_class не учитываем, т.к. из анапы нет рейсов с этим классом*/ economy_class, total_seats, duration, duration_actual,
+        sum (amount) /*сумма за проданные билеты*/ as flihgt_amount, sum (amount)/total_seats /*суума за билеты к общему количеству мест в самолете*/ as udel_amount, 
+        count (ticket_no) /*количество проданных билетов на рейс*/, count (ticket_no)/total_seats as zapoln /*заполненность самолета (востребованность рейса)*/,
+        date_part ('hour', scheduled_departure) as sheduled_hour, date_part ('minute', scheduled_departure) as sheduled_min, EXTRACT(DOW FROM scheduled_departure) as DOW,
+        case 
+          when model like '%737-300%'  then 40*duration/1000
+          when model like '%100%'  then 28.3*duration/1000
+        end as rashod_topliva, -- добавляем колонку с нормативным расходом топлива * время в полете в зависимости от модели самолета, переводим в тонны (данные из Вики)
+        case 
+          when date_part('year', scheduled_departure) = 2016 and date_part('month', scheduled_departure) = 12 then 38867 -- цена в Анапе в декабре 2016
+          when date_part('year', scheduled_departure) = 2017 and date_part('month', scheduled_departure) = 1 then 41435 -- цена в Анапе в январе 2017
+          when date_part('year', scheduled_departure) = 2017 and date_part('month', scheduled_departure) = 2 then 39553 -- цена в Анапе в феврале 2017
+          when date_part('year', scheduled_departure) = 2017 and date_part('month', scheduled_departure) = 12 then 47101 -- цена в Анапе в декабре 2017
+        end as fuel_price
+from flights
+left join seats_class on flights.aircraft_code=seats_class.aircraft_code
+left join dst_project.ticket_flights as t on flights.flight_id=t.flight_id -- Стоимость билетов на рейсе по flight_id
+group by flights.flight_id, flight_no, dep_city, arr_city, model, buisness_class, comfort_class, economy_class, total_seats, duration, duration_actual,
+        date_part ('hour', scheduled_departure), date_part ('minute', scheduled_departure), DOW, rashod_topliva, fuel_price
+order by flights.flight_id
